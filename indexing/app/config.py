@@ -4,17 +4,23 @@ import os
 # Load environment variables from .env file
 dotenv.load_dotenv()
 
+
+# Development or Production
+PROD: bool = False
+
+
 # API credentials
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-
 # Model configuration
 TEXT_EMBEDDING_MODEL: str = "text-embedding-3-small"
 TEXT_GENERATION_MODEL: str = "gpt-5-nano"
+
 
 # Vectorstore set up
 CHUNK_SIZE: int = 1000
 CHUNK_OVERLAP: int = 200
 TOP_K: int = 15
+
 
 # Redis db config
 RD = {
@@ -24,5 +30,8 @@ RD = {
     "password": os.getenv("REDIS_PASSWORD", ""),
 }
 
-# Development or Production
-PROD: bool = False
+
+# Paths
+LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
+LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
+LOCAL_PDF_STORAGE_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/app_arxiv_pdfs"

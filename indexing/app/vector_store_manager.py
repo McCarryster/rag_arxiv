@@ -1,4 +1,3 @@
-import os
 import hashlib
 import pickle
 from pathlib import Path
@@ -15,23 +14,21 @@ from langchain_core.documents import Document
 from redis_db import RedisManager
 
 
+# Protocols for providers
 @runtime_checkable
 class VectorStorageProvider(Protocol):
-    """
-    Protocol defining how the vector store should be persisted.
-    This allows swapping between Local Storage, AWS S3, or Azure Blob.
-    """
     def save(self, vector_store: FAISS, index_name: str) -> None: ...
-    def load(self, embeddings: OpenAIEmbeddings, index_name: str) -> Optional[FAISS]: ...
+    def load(self, embedding_model: OpenAIEmbeddings, index_name: str) -> Optional[FAISS]: ...
     def exists(self, index_name: str) -> bool: ...
 
 @runtime_checkable
 class BM25StorageProvider(Protocol):
-    """Protocol for BM25 storage."""
     def save(self, retriever: BM25Retriever, index_name: str) -> None: ...
     def load(self, index_name: str) -> Optional[BM25Retriever]: ...
+    def exists(self, index_name: str) -> bool: ... # Added for full symmetry
 
-# Faiss storage providers
+
+# Storage providers
 class LocalFaissStorageProvider:
     def __init__(self, base_path: str) -> None:
         self.base_path: Path = Path(base_path)
@@ -41,13 +38,12 @@ class LocalFaissStorageProvider:
         save_path: Path = self.base_path / index_name
         vector_store.save_local(str(save_path))
 
-    def load(self, embeddings: OpenAIEmbeddings, index_name: str) -> Optional[FAISS]:
+    def load(self, embedding_model: OpenAIEmbeddings, index_name: str) -> Optional[FAISS]:
         load_path: Path = self.base_path / index_name
         if self.exists(index_name):
-            # FAISS expects a string path
             return FAISS.load_local(
                 str(load_path), 
-                embeddings, 
+                embedding_model,
                 allow_dangerous_deserialization=True
             )
         return None
@@ -55,49 +51,8 @@ class LocalFaissStorageProvider:
     def exists(self, index_name: str) -> bool:
         return (self.base_path / index_name).exists()
 
-# class S3StorageProvider:
-#     def __init__(self, bucket_name: str, s3_prefix: str = "vector-indices/") -> None:
-#         self.s3 = boto3.client('s3')
-#         self.bucket: str = bucket_name
-#         self.prefix: str = s3_prefix
-#         self.local_tmp: str = "/tmp/faiss_cache"
-
-#     def save(self, vector_store: FAISS, index_name: str) -> None:
-#         # 1. Save locally first
-#         local_path = Path(self.local_tmp) / index_name
-#         vector_store.save_local(str(local_path))
-        
-#         # 2. Upload files to S3 (FAISS creates an index.faiss and index.pkl)
-#         for file in local_path.iterdir():
-#             s3_key = f"{self.prefix}{index_name}/{file.name}"
-#             self.s3.upload_file(str(file), self.bucket, s3_key)
-
-#     def load(self, embeddings: OpenAIEmbeddings, index_name: str) -> Optional[FAISS]:
-#         local_path = Path(self.local_tmp) / index_name
-#         local_path.mkdir(parents=True, exist_ok=True)
-        
-#         try:
-#             # Download files from S3 to local /tmp
-#             response = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=f"{self.prefix}{index_name}/")
-#             if 'Contents' not in response:
-#                 return None
-                
-#             for obj in response['Contents']:
-#                 file_name = obj['Key'].split('/')[-1]
-#                 self.s3.download_file(self.bucket, obj['Key'], str(local_path / file_name))
-            
-#             return FAISS.load_local(str(local_path), embeddings, allow_dangerous_deserialization=True)
-#         except Exception:
-#             return None
-
-#     def exists(self, index_name: str) -> bool:
-#         response = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=f"{self.prefix}{index_name}/", MaxKeys=1)
-#         return 'Contents' in response
-
-
-# BM25 storage providers
 class LocalBM25StorageProvider:
-    """Handles saving/loading the BM25 sparse index."""
+    """Handles saving/loading/checking the BM25 sparse index."""
     def __init__(self, base_path: str) -> None:
         self.base_path: Path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -108,11 +63,14 @@ class LocalBM25StorageProvider:
             pickle.dump(retriever, f)
 
     def load(self, index_name: str) -> Optional[BM25Retriever]:
-        load_path: Path = self.base_path / f"{index_name}_bm25.pkl"
-        if load_path.exists():
+        if self.exists(index_name):
+            load_path: Path = self.base_path / f"{index_name}_bm25.pkl"
             with open(load_path, "rb") as f:
                 return pickle.load(f)
         return None
+
+    def exists(self, index_name: str) -> bool:
+        return (self.base_path / f"{index_name}_bm25.pkl").exists()
 
 
 # Manager for vector db operations
@@ -163,8 +121,10 @@ class VectorStoreManager:
             pages: List[Document] = loader.load()
             chunks: List[Document] = self.text_splitter.split_documents(pages)
 
-            for chunk in chunks:
+            for i, chunk in enumerate(chunks):
                 chunk.metadata["file_hash"] = file_hash
+                chunk.metadata["chunk_id"] = i  
+                chunk.metadata["source"] = Path(path).name
                 
             new_documents.extend(chunks)
             self.tracker.add_hash("processed_pdf_hashes", file_hash)

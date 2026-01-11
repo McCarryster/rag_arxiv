@@ -1,34 +1,15 @@
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
-from pathlib import Path
 import tempfile
 import shutil
 import os
+
 from dependencies import get_vector_store_manager, get_pdf_store_manager
-
-
-# Test
-# folder: Path = Path("/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/local_arxiv_pdfs")
-# pdf_paths: List[str] = [str(path) for path in folder.iterdir() if path.is_file()]
-
-
-# vector_store_manager = get_vector_store_manager()
-# vector_store_manager.add_pdfs(pdf_paths)
-
-# Add endpoint and stuff..
-
-# 1. Take folder with pdfs or a single file
-# 2. Save that new pdf in folder
-# 3. Make vectorization and storing to faiss
-# 4. Make logging and stuff
-
-
 
 class IndexResponse(BaseModel):
     message: str
     files_processed: List[str]
-    total_chunks_added: Optional[int] = None
 app = FastAPI(title="PDF Indexing Service")
 
 @app.post("/index", response_model=IndexResponse)

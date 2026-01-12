@@ -11,7 +11,7 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_core.documents import Document
 
-from redis_db import RedisManager
+from redis_manager import RedisManager
 
 
 # Protocols for providers

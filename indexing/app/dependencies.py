@@ -4,7 +4,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import config
-from redis_db import RedisManager
+from redis_manager import RedisManager
 from pdf_store_manager import PDFStoreManager, LocalPDFStorage
 from vector_store_manager import VectorStoreManager, LocalBM25StorageProvider, LocalFaissStorageProvider
 

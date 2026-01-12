@@ -20,6 +20,14 @@ TEXT_EMBEDDING_MODEL: str = "text-embedding-3-small"
 TOP_K: int = 15
 
 
+# Redis db config
+RD = {
+    "host": os.getenv("REDIS_HOST", ""),
+    "port": os.getenv("REDIS_PORT", 0),
+    "db": os.getenv("REDIS_DB", 0),
+    "password": os.getenv("REDIS_PASSWORD", ""),
+}
+
 # Paths
 LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
 LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"

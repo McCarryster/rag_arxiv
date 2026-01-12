@@ -1,11 +1,14 @@
-import config
 from typing import Optional
 from pydantic import SecretStr
 from langchain_openai import OpenAIEmbeddings
-from vector_search_manager import VectorSearchManager, LocalBM25StorageProvider, LocalFaissStorageProvider
 
+import config
+from vector_search_manager import VectorSearchManager, LocalBM25StorageProvider, LocalFaissStorageProvider
+from redis_cache_manager import RedisCacheManager
 
 _vector_search_manager: Optional[VectorSearchManager] = None
+_redis_cache_manager: Optional[RedisCacheManager] = None
+
 
 def get_vector_search_manager(recreate: bool = False) -> VectorSearchManager:
     """
@@ -44,3 +47,22 @@ def get_vector_search_manager(recreate: bool = False) -> VectorSearchManager:
     )
 
     return _vector_search_manager
+
+def get_redis_cache_manager(recreate: bool = False) -> RedisCacheManager:
+    """
+    Get or create the singleton RedisCacheManager instance.
+    
+    Args:
+        recreate: Force creation of a new instance even if one exists
+        
+    Returns:
+        RedisCacheManager instance
+    """
+    global _redis_cache_manager
+    # Only create if it doesn't exist OR if the path has changed (important for tests!)
+    current_redis_config = config.RD
+    
+    if _redis_cache_manager is None or _redis_cache_manager.redis_config != current_redis_config or recreate:
+        _redis_cache_manager = RedisCacheManager(current_redis_config)
+    
+    return _redis_cache_manager

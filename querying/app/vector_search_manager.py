@@ -1,5 +1,5 @@
 import pickle
-from typing import List, Protocol, Optional, runtime_checkable
+from typing import List, Dict, Any, Protocol, Optional, runtime_checkable
 from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
@@ -7,7 +7,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_core.documents import Document
-
+from langchain_community.docstore.in_memory import InMemoryDocstore
 
 # Protocols for providers
 @runtime_checkable
@@ -103,3 +103,37 @@ class VectorSearchManager:
         Uses the pre-configured ensemble retriever to find documents.
         """
         return self.ensemble_retriever.invoke(query)
+
+    def get_docs_by_metadata(self, metadata_list: List[Dict[str, Any]]) -> List[Document]:
+            """
+            Retrieves full Document objects from the docstore that match a list of metadata filters.
+            
+            Args:
+                metadata_list: A list of dictionaries, where each dict contains metadata 
+                            attributes (e.g., {'file_hash': '...', 'chunk_id': 1}).
+            
+            Returns:
+                A list of Document objects matching the provided metadata sets.
+            """
+            if not self.vector_store or not isinstance(self.vector_store.docstore, InMemoryDocstore):
+                return []
+
+            matched_documents: List[Document] = []
+            doc_dict: Dict[str, Document] = getattr(self.vector_store.docstore, "_dict", {})
+            
+            # Optimization: We iterate through the docstore once and check against all filters
+            # if the docstore is large, or iterate through filters if the filter list is small.
+            # Given cached_metadata is usually top_k (small), we iterate through filters.
+            for criteria in metadata_list:
+                for doc in doc_dict.values():
+                    # Check if all keys in the criteria dict match the document metadata
+                    match: bool = all(
+                        doc.metadata.get(key) == value 
+                        for key, value in criteria.items()
+                    )
+                    if match:
+                        matched_documents.append(doc)
+                        # Break to move to next criteria if we assume 1:1 match for chunk_id
+                        break 
+
+            return matched_documents

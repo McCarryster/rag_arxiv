@@ -82,7 +82,8 @@ class VectorStoreManager:
         faiss_storage_provider: Any,
         bm25_storage_provider: Any,
         duplicate_tracker: RedisManager,
-        index_name: str
+        index_name: str,
+        monitoring_handler: Optional[Any] = None
     ) -> None:
         self.embedding_model: OpenAIEmbeddings = embedding_model
         self.text_splitter: RecursiveCharacterTextSplitter = text_splitter
@@ -90,6 +91,7 @@ class VectorStoreManager:
         self.bm25_storage = bm25_storage_provider
         self.tracker: RedisManager = duplicate_tracker
         self.index_name: str = index_name
+        self.monitoring_handler: Optional[Any] = monitoring_handler
 
         self.vector_store: Optional[FAISS] = self.faiss_storage.load(self.embedding_model, self.index_name)
         self.bm25_retriever: Optional[BM25Retriever] = self.bm25_storage.load(self.index_name)
@@ -109,6 +111,9 @@ class VectorStoreManager:
     def add_pdfs(self, file_paths: List[str]) -> Dict[str, str]:
         new_documents: List[Document] = []
         path_to_hash_map: Dict[str, str] = {}
+
+        # Langchain internal operations will check for 'callbacks' in config
+        monitoring_config: Dict[str, Any] = {"callbacks": [self.monitoring_handler]} if self.monitoring_handler else {}
 
         for path in file_paths:
             file_hash: str = self._get_file_hash(path)
@@ -132,16 +137,16 @@ class VectorStoreManager:
         if new_documents:
             # 1. Update FAISS (Dense)
             if self.vector_store is None:
-                self.vector_store = FAISS.from_documents(new_documents, self.embedding_model)
+                self.vector_store = FAISS.from_documents(new_documents, self.embedding_model, **monitoring_config)
             else:
-                self.vector_store.add_documents(new_documents)
+                self.vector_store.add_documents(new_documents, **monitoring_config)
             self.faiss_storage.save(self.vector_store, self.index_name)
 
             # 2. Update BM25 (Sparse)
             all_docs: List[Document] = []
             if self.vector_store and isinstance(self.vector_store.docstore, InMemoryDocstore):
                 # Pull all current docs from FAISS to ensure BM25 is synced
-                doc_dict = getattr(self.vector_store.docstore, "_dict", {})
+                doc_dict: Dict[str, Document] = getattr(self.vector_store.docstore, "_dict", {})
                 all_docs = list(doc_dict.values())
             if all_docs:
                 self.bm25_retriever = BM25Retriever.from_documents(all_docs)

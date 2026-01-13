@@ -7,6 +7,7 @@ import config
 from redis_manager import RedisManager
 from pdf_store_manager import PDFStoreManager, LocalPDFStorage
 from vector_store_manager import VectorStoreManager, LocalBM25StorageProvider, LocalFaissStorageProvider
+from monitoring import LangfuseMonitor
 
 _redis_manager: Optional[RedisManager] = None
 _vector_store_manager: Optional[VectorStoreManager] = None
@@ -48,12 +49,18 @@ def get_vector_store_manager(recreate: bool = False) -> VectorStoreManager:
     if _vector_store_manager is not None and not recreate:
         return _vector_store_manager
 
+    monitoring_handler: Optional[LangfuseMonitor] = None
+    if config.LANGFUSE_AVAILABLE:
+        monitoring_handler=LangfuseMonitor()
+
     # 1. Setup Models
     embedding_model = OpenAIEmbeddings(
         api_key=SecretStr(config.OPENAI_API_KEY), 
-        model=config.TEXT_EMBEDDING_MODEL
+        model=config.TEXT_EMBEDDING_MODEL,
+        callbacks=[monitoring_handler] if monitoring_handler else []
     )
     
+
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=config.CHUNK_SIZE, 
         chunk_overlap=config.CHUNK_OVERLAP
@@ -75,7 +82,8 @@ def get_vector_store_manager(recreate: bool = False) -> VectorStoreManager:
         faiss_storage_provider=faiss_p,
         bm25_storage_provider=bm25_p,
         duplicate_tracker=redis_manager,
-        index_name="arxiv_papers_index"
+        index_name="arxiv_papers_index",
+        monitoring_handler=monitoring_handler
     )
 
     return _vector_store_manager

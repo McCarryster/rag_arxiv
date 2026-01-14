@@ -6,30 +6,6 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from prometheus_client import make_asgi_app
 
-import os
-from langfuse import Langfuse
-from langfuse.langchain import CallbackHandler
-import config  # Your config module
-
-# Set env vars from config at module level (before Langfuse imports)
-os.environ["LANGFUSE_PUBLIC_KEY"] = config.LANGFUSE_PUBLIC_KEY
-os.environ["LANGFUSE_SECRET_KEY"] = config.LANGFUSE_SECRET_KEY
-os.environ["LANGFUSE_HOST"] = config.LANGFUSE_HOST
-
-class LangfuseMonitor:
-    def __init__(self) -> None:
-        """Initializes using config values set as environment variables."""
-        self.langfuse = Langfuse()
-        self.langchain_handler: CallbackHandler = CallbackHandler()
-
-    def get_handler(self) -> CallbackHandler:
-        """Returns the LangChain-specific callback handler."""
-        return self.langchain_handler
-
-    def flush(self) -> None:
-        """Ensures all traces are sent to Langfuse server before shutdown."""
-        self.langfuse.flush()
-
 def setup_monitoring(app: FastAPI, service_name: str) -> None:
     """
     Sets up OpenTelemetry instrumentation and Prometheus metrics exporter for a FastAPI app.

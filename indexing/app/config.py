@@ -38,8 +38,3 @@ RD = {
 LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
 LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
 LOCAL_PDF_STORAGE_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/app_arxiv_pdfs"
-
-
-# Monitoring config
-SERVICE_NAME: str = "pdf-indexing-service"
-ENVIRONMENT: str = "development" if not PROD else "production"

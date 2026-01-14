@@ -2,14 +2,28 @@ import os
 import shutil
 import tempfile
 import time
-from typing import List, Optional, Dict
+from typing import List, Dict, Optional
 
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from opentelemetry.metrics import Counter, Histogram
 
-from monitoring import setup_monitoring, get_meter
-from dependencies import get_vector_store_manager, get_pdf_store_manager
+from langfuse import Langfuse
+from opentelemetry.sdk.trace import TracerProvider
+
+from telemetry import setup_monitoring, get_meter
+from dependencies import get_vector_store_manager, get_pdf_store_manager, get_redis_manager
+import config
+
+
+# Very important. Stops all shit tracing (helps to focus only on model related stuff)
+langfuse_tracing: Optional[Langfuse] = None
+if config.LANGFUSE_AVAILABLE:
+    langfuse_tracer_provider = TracerProvider()
+    langfuse_tracing = Langfuse(
+        blocked_instrumentation_scopes=["fastapi", "starlette"],
+        tracer_provider=langfuse_tracer_provider
+    )
 
 class IndexResponse(BaseModel):
     message: str
@@ -35,15 +49,18 @@ indexing_latency: Histogram = meter.create_histogram(
     unit="s"
 )
 
+
 @app.post("/index", response_model=IndexResponse)
 async def index_data(files: List[UploadFile] = File(...)) -> IndexResponse:
     start_time: float = time.perf_counter()
 
     # Setup managers
-    vector_store_manager = get_vector_store_manager()
+    vector_store_manager = get_vector_store_manager(False, langfuse_tracing)
     pdf_store_manager = get_pdf_store_manager()
+    redis_manager = get_redis_manager()
     
-    temp_paths: List[str] = []
+    # temp_paths: List[str] = []
+    temp_paths_hashes: Dict[str, str] = {} # {temp_path: file_hash}
     processed_files: List[str] = []
     temp_dir: str = tempfile.mkdtemp()
 
@@ -52,21 +69,20 @@ async def index_data(files: List[UploadFile] = File(...)) -> IndexResponse:
         for file in files:
             if not file.filename or not file.filename.lower().endswith(".pdf"):
                 continue
-            
             temp_path: str = os.path.join(temp_dir, file.filename)
             with open(temp_path, "wb") as f:
                 shutil.copyfileobj(file.file, f)
-            temp_paths.append(temp_path)
-            processed_files.append(file.filename)
+            current_hash: str = vector_store_manager.get_file_hash(temp_path)
+            if not redis_manager.is_duplicate("processed_pdf_hashes", current_hash):
+                temp_paths_hashes[temp_path] = current_hash
 
         # Index and get hashes
-        path_to_hashes: Dict[str, str] = vector_store_manager.add_pdfs(temp_paths)
+        vector_store_manager.add_pdfs(temp_paths_hashes)
 
         # Store PDFs using the already calculated hashes
-        for path in temp_paths:
-            file_hash: Optional[str] = path_to_hashes.get(path)
+        for path, file_hash in temp_paths_hashes.items():
             pdf_store_manager.save_pdf(path, existing_hash=file_hash)
-            
+            processed_files.append(path)
             indexed_pdf_counter.add(1, {"status": "success"}) # Increment the Prometheus counter for each successful file
 
     except Exception as e:
@@ -78,8 +94,6 @@ async def index_data(files: List[UploadFile] = File(...)) -> IndexResponse:
         end_time: float = time.perf_counter()
         duration: float = end_time - start_time
         indexing_latency.record(duration, {"endpoint": "/index"}) # Track time
-        if hasattr(vector_store_manager, 'monitoring_handler') and vector_store_manager.monitoring_handler:
-            vector_store_manager.monitoring_handler.flush() # Flush Langfuse traces specifically
 
     return IndexResponse(
         message="Process complete",

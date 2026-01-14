@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s # How often to pull data
+
+scrape_configs:
+  - job_name: 'fastapi-app'
+    metrics_path: '/metrics'
+    static_configs:
+      # Use 'host.docker.internal' to let the Docker container 
+      # reach FastAPI app running on your local machine.
+      - targets: ['host.docker.internal:8000']

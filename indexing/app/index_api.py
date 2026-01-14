@@ -10,8 +10,8 @@ from opentelemetry.metrics import Counter, Histogram
 
 from langfuse import Langfuse
 from opentelemetry.sdk.trace import TracerProvider
-
 from telemetry import setup_monitoring, get_meter
+
 from dependencies import get_vector_store_manager, get_pdf_store_manager, get_redis_manager
 import config
 

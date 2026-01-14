@@ -1,6 +1,7 @@
 import pickle
 from typing import List, Dict, Any, Protocol, Optional, runtime_checkable
 from pathlib import Path
+import tiktoken
 
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -8,6 +9,10 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_core.documents import Document
 from langchain_community.docstore.in_memory import InMemoryDocstore
+
+from langfuse import Langfuse
+
+import config
 
 # Protocols for providers
 @runtime_checkable
@@ -71,7 +76,8 @@ class VectorSearchManager:
         index_name: str,
         top_k: int = 4,
         faiss_retriever_weight: float = 0.5,
-        bm25_retriever_weight: float = 0.5
+        bm25_retriever_weight: float = 0.5,
+        langfuse_tracing: Optional[Langfuse] = None
     ) -> None:
         self.embedding_model: OpenAIEmbeddings = embedding_model
         self.faiss_storage: VectorStorageProvider = faiss_storage_provider
@@ -80,6 +86,7 @@ class VectorSearchManager:
         self.top_k: int = top_k
         self.faiss_retriever_weight: float = faiss_retriever_weight
         self.bm25_retriever_weight: float = bm25_retriever_weight
+        self.langfuse_tracing: Optional[Langfuse] = langfuse_tracing
 
         # Load instances
         self.vector_store: Optional[FAISS] = self.faiss_storage.load(self.embedding_model, self.index_name)
@@ -137,3 +144,35 @@ class VectorSearchManager:
                         break 
 
             return matched_documents
+
+    def generate_embeddings(self, text: str) -> List[float]:
+        if self.langfuse_tracing:
+            trace_summary: Dict[str, Any] = {"total_character_length": len(text)}
+            embedding_obs = self.langfuse_tracing.start_observation(
+                name="openai_embedding_generation",
+                as_type="embedding",
+                model=config.TEXT_EMBEDDING_MODEL,
+                input=trace_summary
+            )
+            try:
+                embedding: List[float] = self.embedding_model.embed_query(text)
+                # Calculate token usage
+                encoding = tiktoken.encoding_for_model(config.TEXT_EMBEDDING_MODEL)
+                total_input_tokens: int = len(encoding.encode(text))
+                # Update observation with usage and metadata
+                embedding_obs.update(
+                    usage={
+                        "input": total_input_tokens,
+                        "total": total_input_tokens,
+                    },
+                    output={"dimensions": len(embedding)}  # log the metadata/dimensions
+                )
+                embedding_obs.end()
+                self.langfuse_tracing.flush()
+                return embedding
+            except Exception as e:
+                embedding_obs.update(level="ERROR", status_message=str(e))  # Ensure errors are logged to the trace if generation fails
+                embedding_obs.end()
+                raise e
+        else:
+            return self.embedding_model.embed_query(text)

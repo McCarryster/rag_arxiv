@@ -12,7 +12,7 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_core.documents import Document
 
-from langfuse import observe
+from langfuse import Langfuse
 
 from redis_manager import RedisManager
 import config
@@ -86,7 +86,7 @@ class VectorStoreManager:
         bm25_storage_provider: Any,
         duplicate_tracker: RedisManager,
         index_name: str,
-        langfuse_tracing: Optional[Any] = None
+        langfuse_tracing: Optional[Langfuse] = None
     ) -> None:
         self.embedding_model: OpenAIEmbeddings = embedding_model
         self.text_splitter: RecursiveCharacterTextSplitter = text_splitter

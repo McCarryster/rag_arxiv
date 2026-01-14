@@ -1,16 +1,28 @@
-from typing import List, Dict, Any
-from pydantic import BaseModel, SecretStr
-from fastapi import FastAPI
-from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from typing import List, Dict, Any, Optional
+import time
 
-from dependencies import get_vector_search_manager, get_redis_cache_manager
-from utils import format_context_for_prompt
+from pydantic import BaseModel
+from fastapi import FastAPI
+
+from langchain_core.documents import Document
+
+from langfuse import Langfuse
+from opentelemetry.sdk.trace import TracerProvider
+from telemetry import setup_monitoring, get_meter
+from opentelemetry.metrics import Counter, Histogram
+
+from dependencies import get_vector_search_manager, get_redis_cache_manager, get_llm_generation_manger
 import config
-import prompt
+
+
+# Very important. Stops all shit tracing (helps to focus only on model related stuff)
+langfuse_tracing: Optional[Langfuse] = None
+if config.LANGFUSE_AVAILABLE:
+    langfuse_tracer_provider = TracerProvider()
+    langfuse_tracing = Langfuse(
+        blocked_instrumentation_scopes=["fastapi", "starlette"],
+        tracer_provider=langfuse_tracer_provider
+    )
 
 
 # --- Models ---
@@ -26,13 +38,30 @@ class IndexResponse(BaseModel):
 app = FastAPI(title="Arxiv Query Service")
 
 
+# Initialize Monitoring. This instruments FastAPI and sets up the /metrics endpoint
+setup_monitoring(app, service_name="pdf-querying-service")
+
+# Define Metrics
+meter = get_meter("pdf_querier")
+hb_search_latency: Histogram = meter.create_histogram(
+    name="hb_duration_seconds",
+    description="Time spent on vector similarity and BM25 search for relevant docs",
+    unit="s"
+)
+
+redis_semantic_search_latency: Histogram = meter.create_histogram(
+    name="redis_semantic_search_duration_seconds",
+    description="Time spent on semantic search for a similar query in Redis using KNN",
+    unit="s"
+)
+
 # --- Endpoint ---
 @app.post("/query", response_model=IndexResponse)
 async def query_index(request: QueryRequest) -> IndexResponse:
     # 1. Setup Managers
-    vector_search_manager = get_vector_search_manager()
+    vector_search_manager = get_vector_search_manager(False, langfuse_tracing)
     cache_manager = get_redis_cache_manager()
-
+    llm_generation_manager = get_llm_generation_manger(False, langfuse_tracing)
 
     # Caching 1. Exact match caching (skips LLM generation)
     exact_hit = cache_manager.get_exact_cache(request.user_query)
@@ -45,14 +74,15 @@ async def query_index(request: QueryRequest) -> IndexResponse:
 
 
     # 2. Generate Embedding
-    query_vector: List[float] = vector_search_manager.embedding_model.embed_query(request.user_query)
+    query_vector: List[float] = vector_search_manager.generate_embeddings(request.user_query)
 
 
     # Caching 2. Similarity caching (skips Hybrid Search)
-    # High threshold (0.05) = Skip LLM. 
-    # Mid threshold (0.15) = Skip Retrieval but re-run LLM.
+    # High threshold (0.05) = Skip LLM | (0.15) = Skip Retrieval but re-run LLM
+    start_time: float = time.perf_counter()
     semantic_hit = cache_manager.get_semantic_cache(query_vector, threshold=0.15)
-    
+    end_time: float = time.perf_counter()
+    hb_search_latency.record(end_time-start_time, {"endpoint": "/index"}) # Track time
     retrieved_docs: List[Document] = []
     if semantic_hit:
         score: float = semantic_hit["score"]
@@ -67,15 +97,17 @@ async def query_index(request: QueryRequest) -> IndexResponse:
             )
         
         # Scenario 2: Same topic, different phrasing (Medium Confidence). Reuse the source metadata to skip Hybrid Search
-        print(f"Semantic Retrieval Hit (Score: {score:.4f}). Skipping Hybrid Search.")
         cached_metadata = data["sources"]
         retrieved_docs = vector_search_manager.get_docs_by_metadata(cached_metadata)
 
 
     # 3. If no cache hits for retrieval, perform Hybrid Search
     if not retrieved_docs:
+        start_time: float = time.perf_counter()
         retrieved_docs = vector_search_manager.perform_hybrid_search(request.user_query)
-
+        end_time: float = time.perf_counter()
+        redis_semantic_search_latency.record(end_time-start_time, {"endpoint": "/index"}) # Track time
+    
     if not retrieved_docs:
         return IndexResponse(
             message="No matches",
@@ -83,32 +115,11 @@ async def query_index(request: QueryRequest) -> IndexResponse:
             sources=[]
         )
 
-    # 4. Model Setup & Execution
-    text_generation_model = ChatOpenAI(
-        api_key=SecretStr(config.OPENAI_API_KEY), 
-        model=config.TEXT_GENERATION_MODEL,
-        temperature=0
-    )
-
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", prompt.SYSTEM_PROMPT),
-        ("human", "{query}")
-    ])
-
-    chain = (
-        {
-            "context": lambda x: format_context_for_prompt(retrieved_docs),
-            "query": RunnablePassthrough()
-        }
-        | prompt_template
-        | text_generation_model
-        | StrOutputParser()
-    )
 
     # Execute LLM (Only reached if Exact hit failed AND Semantic high-confidence hit failed)
-    answer: str = await chain.ainvoke(request.user_query)
+    answer: str = llm_generation_manager.generate_answer(request.user_query, retrieved_docs)
 
-    # 5. Final Source Collection
+    # 4. Final Source Collection
     sources: List[Dict[str, Any]] = [
         {
             "id": d.metadata.get("source"),
@@ -118,14 +129,13 @@ async def query_index(request: QueryRequest) -> IndexResponse:
         for d in retrieved_docs
     ]
 
-    # 6. Store in both Caches
+    # 5. Store in both Caches
     cache_payload: Dict[str, Any] = {
         "model_response": answer,
         "sources": sources
     }
     
-    # Store exact text hash
-    cache_manager.set_exact_cache(request.user_query, cache_payload)
+    cache_manager.set_exact_cache(request.user_query, cache_payload) # Store exact text hash
     
     # Store semantic vector
     cache_manager.set_semantic_cache(

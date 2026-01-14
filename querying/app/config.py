@@ -16,9 +16,17 @@ TEXT_GENERATION_MODEL: str = "gpt-5-nano"
 TEXT_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
 
+# Langfuse set up
+LANGFUSE_AVAILABLE = True
+LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "")
+
+
 # Vector search setup
 TOP_K: int = 15
-
+# Text generation setup
+TEMPERATURE: int = 0 # 0 for RAG factual accuracy
 
 # Redis db config
 RD = {

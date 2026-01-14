@@ -3,7 +3,6 @@ from pydantic import SecretStr
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from langfuse import get_client
 from langfuse import Langfuse
 
 import config

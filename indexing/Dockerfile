@@ -23,28 +23,22 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 # ----------------------
 FROM python:3.11-slim
 
-# Create non-root user first
 RUN useradd --create-home appuser
 WORKDIR /app
 
-# Copy the virtual environment from the builder
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy application code
-# Note: Ensure the path matches your CMD (app/index_api.py)
+# 1. Add /app/app to PYTHONPATH so "import telemetry" works
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONPATH="/app/app:${PYTHONPATH}"
+ENV PYTHONUNBUFFERED=1
+
 COPY indexing/app/ ./app/
 
-# Set permissions
-RUN chown -R appuser:appuser /app /opt/venv
-
-# Set environment variables
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
+RUN chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 
-# Use the absolute path to gunicorn inside the venv to be safe
+# 2. Run gunicorn from the /app directory
 CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.index_api:app", "--bind", "0.0.0.0:8000"]

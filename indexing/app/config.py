@@ -35,6 +35,9 @@ RD = {
 
 
 # Paths
-LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
-LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
-LOCAL_PDF_STORAGE_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/app_arxiv_pdfs"
+# LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
+# LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
+# LOCAL_PDF_STORAGE_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/app_arxiv_pdfs"
+LOCAL_FAISS_PATH: str = os.getenv("LOCAL_FAISS_PATH", "")
+LOCAL_BM25_PATH: str = os.getenv("LOCAL_BM25_PATH", "")
+LOCAL_PDF_STORAGE_PATH: str = os.getenv("LOCAL_PDF_STORAGE_PATH", "")

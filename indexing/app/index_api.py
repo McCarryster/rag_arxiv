@@ -99,3 +99,11 @@ async def index_data(files: List[UploadFile] = File(...)) -> IndexResponse:
         message="Process complete",
         files_processed=processed_files
     )
+
+
+@app.get("/health")
+def health_check() -> Dict[str, str]:
+    """
+    Health check endpoint.
+    """
+    return {"status": "ok"}

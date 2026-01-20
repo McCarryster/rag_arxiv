@@ -15,6 +15,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
+# Install requirements + production server inside the venv
 RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 
 # ----------------------
@@ -22,22 +23,22 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 # ----------------------
 FROM python:3.11-slim
 
+RUN useradd --create-home appuser
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 
 # 1. Add /app/app to PYTHONPATH so "import telemetry" works
 ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONPATH="/app/app"
+ENV PYTHONPATH="/app/app:${PYTHONPATH}"
 ENV PYTHONUNBUFFERED=1
 
-COPY indexing/app/ ./app/
+COPY querying/app/ ./app/
 
-# Create directories explicitly
-RUN mkdir -p /app/vector_db /app/bm25_storage /app/arxiv_pdfs_storage
+RUN chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8000
 
 # 2. Run gunicorn from the /app directory
-# CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.index_api:app", "--bind", "0.0.0.0:8000"]
-CMD ["/opt/venv/bin/gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.index_api:app", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.query_api:app", "--bind", "0.0.0.0:8080"]

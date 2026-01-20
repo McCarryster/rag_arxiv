@@ -149,3 +149,10 @@ async def query_index(request: QueryRequest) -> IndexResponse:
         model_response=answer,
         sources=sources
     )
+
+@app.get("/health")
+def health_check() -> Dict[str, str]:
+    """
+    Health check endpoint.
+    """
+    return {"status": "ok"}

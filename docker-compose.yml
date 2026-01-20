@@ -1,19 +1,44 @@
 services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    restart: always
-
-  rag_arxiv_indexing_service:
+  vector-db-api:
     build:
       context: .
-      dockerfile: indexing/Dockerfile
+      dockerfile: vector_db_service/Dockerfile
+    image: weaviate_vector_db:latest
+    container_name: vector-db-api
     ports:
-      - "8000:8000"
-    env_file:
-      - indexing/.env
+      - "8000:80"
     environment:
-      - REDIS_HOST=redis
+      # FastAPI / app config
+      PORT: 80
+      GUNICORN_WORKERS: 4
+
+      # Weaviate connection (used by your app)
+      WEAVIATE_HOST: weaviate
+      WEAVIATE_PORT: 8080
+      WEAVIATE_GRPC_PORT: 50051
     depends_on:
-      - redis
+      weaviate:
+        condition: service_healthy
+    restart: unless-stopped
+
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 20
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  weaviate_data:

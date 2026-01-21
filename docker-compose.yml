@@ -1,17 +1,32 @@
 services:
-  vector-db-api:
+  index_service:
+    image: index_service:latest
+    build:
+      context: .
+      dockerfile: index_service/Dockerfile
+    container_name: index_service
+    depends_on:
+      vector_db_service:
+        condition: service_started
+    ports:
+      - "9000:80"   # expose FastAPI if you want host access
+    env_file:
+      - index_service/.env
+    volumes:
+      - pdf_storage_data:/app/data/pdfs
+    restart: unless-stopped
+
+  vector_db_service:
     build:
       context: .
       dockerfile: vector_db_service/Dockerfile
-    image: weaviate_vector_db:latest
-    container_name: vector-db-api
+    image: vector_db_service:latest
+    container_name: vector_db_service
     ports:
       - "8000:80"
     environment:
-      # FastAPI / app config
       PORT: 80
       GUNICORN_WORKERS: 4
-
       # Weaviate connection (used by your app)
       WEAVIATE_HOST: weaviate
       WEAVIATE_PORT: 8080
@@ -40,5 +55,13 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
 volumes:
   weaviate_data:
+  pdf_storage_data:

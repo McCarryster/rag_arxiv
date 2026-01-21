@@ -11,7 +11,7 @@ class PDFStorageProvider(Protocol):
     def download_file(self, remote_name: str, local_destination: str) -> str: ...
     def list_files(self) -> List[str]: ...
 
-class LocalPDFStorage:
+class PDFStorage:
     """Implementation for storing PDFs on the local file system (Dev/Test)."""
     def __init__(self, base_dir: str) -> None:
         self.base_dir: Path = Path(base_dir)

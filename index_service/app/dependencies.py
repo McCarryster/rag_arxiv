@@ -4,11 +4,12 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from langfuse import Langfuse
+from langfuse import get_client
 
 import config
 from redis_manager import RedisManager
-from pdf_store_manager import PDFStoreManager, LocalPDFStorage
-from vector_store_manager import VectorStoreManager, LocalBM25StorageProvider, LocalFaissStorageProvider
+from pdf_store_manager import PDFStoreManager, PDFStorage
+from vector_store_manager import VectorStoreManager
 
 _redis_manager: Optional[RedisManager] = None
 _vector_store_manager: Optional[VectorStoreManager] = None
@@ -35,7 +36,7 @@ def get_redis_manager(recreate: bool = False) -> RedisManager:
     return _redis_manager
 
 
-def get_vector_store_manager(recreate: bool = False, langfuse_tracing: Optional[Langfuse] = None) -> VectorStoreManager:
+def get_vector_store_manager(recreate: bool = False) -> VectorStoreManager:
     """
     Get or create the singleton VectorStoreManager instance.
     
@@ -61,24 +62,17 @@ def get_vector_store_manager(recreate: bool = False, langfuse_tracing: Optional[
         chunk_overlap=config.CHUNK_OVERLAP
     )
 
-    # 2. Setup Storage (Environment Aware)
-    if not config.PROD:
-        faiss_p = LocalFaissStorageProvider(base_path=config.LOCAL_FAISS_PATH)
-        bm25_p = LocalBM25StorageProvider(base_path=config.LOCAL_BM25_PATH)
-    else:
-        raise NotImplementedError("S3 Storage Providers not yet implemented for PROD.")
+    langfuse = get_client() if config.LANGFUSE_AVAILABLE else None
 
-    # 3. Setup Redis
+    # 2. Setup Redis
     redis_manager = get_redis_manager(recreate=recreate)
 
     _vector_store_manager = VectorStoreManager(
         embedding_model=embedding_model,
         text_splitter=text_splitter,
-        faiss_storage_provider=faiss_p,
-        bm25_storage_provider=bm25_p,
         duplicate_tracker=redis_manager,
         index_name="arxiv_papers_index",
-        langfuse_tracing=langfuse_tracing
+        langfuse_tracing=langfuse
     )
 
     return _vector_store_manager
@@ -100,7 +94,7 @@ def get_pdf_store_manager(recreate: bool = False) -> PDFStoreManager:
         return _pdf_store_manager
 
     if not config.PROD:
-        pdf_storage_provider = LocalPDFStorage(base_dir=config.LOCAL_PDF_STORAGE_PATH)
+        pdf_storage_provider = PDFStorage(base_dir=config.PDF_STORAGE_PATH)
     else:
         raise NotImplementedError("S3 Storage Providers not yet implemented for PROD.")
 

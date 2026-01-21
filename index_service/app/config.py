@@ -14,11 +14,13 @@ OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 # Model configuration
 TEXT_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
+
 # Langfuse set up
 LANGFUSE_AVAILABLE = True
 LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "")
+
 
 # Vectorstore set up
 CHUNK_SIZE: int = 1000
@@ -35,9 +37,5 @@ RD = {
 
 
 # Paths
-# LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
-# LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
-# LOCAL_PDF_STORAGE_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/app_arxiv_pdfs"
-LOCAL_FAISS_PATH: str = os.getenv("LOCAL_FAISS_PATH", "")
-LOCAL_BM25_PATH: str = os.getenv("LOCAL_BM25_PATH", "")
-LOCAL_PDF_STORAGE_PATH: str = os.getenv("LOCAL_PDF_STORAGE_PATH", "")
+VECTOR_DB_API_URL: str = os.getenv("VECTOR_DB_API_URL", "")
+PDF_STORAGE_PATH: str = os.getenv("PDF_STORAGE_PATH", "")

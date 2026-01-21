@@ -15,6 +15,21 @@ class RedisManager:
             decode_responses=True
         )
 
+    def add_if_not_exists(self, name: str, file_hash: str) -> bool:
+        """
+        Atomically add hash to a Redis set if it does not already exist.
+
+        Args:
+            name: Redis set key
+            file_hash: SHA-256 hash
+
+        Returns:
+            True  -> hash was newly added (process it)
+            False -> hash already existed (skip it)
+        """
+        result: int = cast(int, self.client.sadd(name, file_hash))
+        return result == 1
+
     def is_duplicate(self, name: str, file_hash: str) -> bool:
         """
         Check if hash exists in the Redis set.

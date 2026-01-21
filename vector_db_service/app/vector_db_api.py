@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 app: FastAPI = FastAPI(title="Weaviate VectorDB API", lifespan=lifespan)
 
+
 # -------------------------
 # Models
 # -------------------------
@@ -71,37 +72,6 @@ def add_embeddings(
         raise HTTPException(status_code=500, detail="Failed to add embeddings") from exc
     
     return {"status": "success"}
-
-# @app.post("/search/hybrid", response_model=HybridSearchResponse)
-# def hybrid_search(
-#     request: HybridSearchRequest,
-#     vector_db_manager: WeaviateDBManager = Depends(get_vector_db_manager),
-# ) -> HybridSearchResponse:
-
-#     try:
-#         results = vector_db_manager.hybrid_search(
-#             query_text=request.query_text,
-#             query_embedding=request.query_embedding,
-#             limit=request.limit,
-#             alpha=request.alpha,
-#         )
-#     except ValueError as exc:
-#         raise HTTPException(status_code=400, detail=str(exc)) from exc
-#     except Exception as exc:
-#         raise HTTPException(status_code=500, detail="Hybrid search failed") from exc
-
-#     return HybridSearchResponse(
-#         results=[
-#             HybridSearchResult(
-#                 id=str(item["id"]),
-#                 text=item["text"],
-#                 metadata=item["metadata"],
-#                 file_hash=item["file_hash"],
-#                 chunk_id=item["chunk_id"],
-#             )
-#             for item in results
-#         ]
-#     )
 
 @app.post("/search/hybrid", response_model=HybridSearchResponse)
 def hybrid_search(

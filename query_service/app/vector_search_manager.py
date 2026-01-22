@@ -8,23 +8,15 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 
 from langfuse import Langfuse
+from langfuse_decorator import async_trace
 
 import config
 
 
 # Manager for vector search operations
 class VectorSearchManager:
-    def __init__(
-        self,
-        embedding_model: OpenAIEmbeddings,
-        index_name: str,
-        top_k: int = 4,
-        langfuse_tracing: Optional[Langfuse] = None
-    ) -> None:
+    def __init__(self, embedding_model: OpenAIEmbeddings) -> None:
         self.embedding_model: OpenAIEmbeddings = embedding_model
-        self.index_name: str = index_name
-        self.top_k: int = top_k
-        self.langfuse_tracing: Optional[Langfuse] = langfuse_tracing
 
     async def _post_to_vector_db_async(self, payload: Dict[str, Any], endpoint_url: str) -> Dict[str, Any]:
         async with httpx.AsyncClient(timeout=120) as client:
@@ -116,32 +108,23 @@ class VectorSearchManager:
             )
         return results
 
-    async def generate_embeddings(self, text: str) -> List[float]:
-        if self.langfuse_tracing:
-            trace_summary: Dict[str, Any] = {"total_character_length": len(text)}
-            
-            with self.langfuse_tracing.start_as_current_observation(
-                as_type="embedding",
-                name="openai_embedding_generation",
-                model=config.TEXT_EMBEDDING_MODEL,
-                input=trace_summary
-            ) as embedding_obs:
-                try:
-                    embedding: List[float] = await run_in_threadpool(self.embedding_model.embed_query, text)
-                    
-                    encoding = tiktoken.encoding_for_model(config.TEXT_EMBEDDING_MODEL)
-                    total_input_tokens: int = len(encoding.encode(text))
-                    
-                    embedding_obs.update(
-                        usage_details={
-                            "input": total_input_tokens,
-                            "total": total_input_tokens,
-                        },
-                        output={"dimensions": len(embedding)}
-                    )
-                    return embedding
-                except Exception as e:
-                    embedding_obs.update(level="ERROR", status_message=str(e))
-                    raise e
-        else:
-            return await run_in_threadpool(self.embedding_model.embed_query, text)
+    @async_trace(name="query pipeline", model=config.TEXT_EMBEDDING_MODEL)
+    async def generate_embeddings(self, text: str) -> Dict[str, Any]:
+        embedding: List[float] = await run_in_threadpool(self.embedding_model.embed_query, text)
+        encoding = tiktoken.encoding_for_model(config.TEXT_EMBEDDING_MODEL)
+        total_input_tokens: int = len(encoding.encode(text))
+
+        print("[DEBUG]: LANFUSE", "Shit happened", flush=True)
+        
+        result: Dict[str, Any] = {
+            "result": embedding,
+            "input": text,
+            "output": len(embedding),
+            "input_tokens": total_input_tokens,
+            "total_tokens": total_input_tokens,
+            "metadata": {
+                "text_length": len(text),
+                "embedding_dimensions": len(embedding)
+            }
+        }
+        return result

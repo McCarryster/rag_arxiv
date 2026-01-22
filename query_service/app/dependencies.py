@@ -2,11 +2,9 @@ from typing import Optional
 from pydantic import SecretStr
 
 from langchain_openai import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
 from openai import OpenAI
+# from langfuse.openai import OpenAI # type: ignore
 
-from langfuse import Langfuse
 from langfuse import get_client
 
 import config
@@ -41,13 +39,8 @@ def get_vector_search_manager(recreate: bool = False) -> VectorSearchManager:
         model=config.TEXT_EMBEDDING_MODEL
     )
 
-    langfuse = get_client() if config.LANGFUSE_AVAILABLE else None
-
     _vector_search_manager = VectorSearchManager(
         embedding_model=embedding_model,
-        index_name="arxiv_papers_index",
-        top_k=config.TOP_K,
-        langfuse_tracing=langfuse
     )
 
     return _vector_search_manager
@@ -90,11 +83,9 @@ def get_llm_generation_manger(recreate: bool = False) -> LLMGenerationManager:
 
     client = OpenAI(api_key=config.OPENAI_API_KEY)
 
-    langfuse = get_client() if config.LANGFUSE_AVAILABLE else None
 
     _llm_generation_manger = LLMGenerationManager(
         client=client,
-        langfuse_tracing=langfuse
     )
 
     return _llm_generation_manger

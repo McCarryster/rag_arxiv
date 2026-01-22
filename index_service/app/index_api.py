@@ -105,8 +105,8 @@ async def index_data(
             if not redis_manager.is_duplicate("processed_pdf_hashes", current_hash):
                 temp_paths_hashes[temp_path] = current_hash
 
-        # Index and get hashes
-        vector_store_manager.add_embeddings(temp_paths_hashes)
+        # Index
+        await vector_store_manager.add_embeddings(temp_paths_hashes)
 
         # Store PDFs using the already calculated hashes
         for path, file_hash in temp_paths_hashes.items():

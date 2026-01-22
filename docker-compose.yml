@@ -16,6 +16,21 @@ services:
       - pdf_storage_data:/app/data/pdfs
     restart: unless-stopped
 
+  query_service:
+    image: query_service:latest
+    build:
+      context: .
+      dockerfile: query_service/Dockerfile
+    container_name: query_service
+    depends_on:
+      vector_db_service:
+        condition: service_started
+    ports:
+      - "9001:80"   # expose FastAPI if you want host access
+    env_file:
+      - query_service/.env
+    restart: unless-stopped
+
   vector_db_service:
     build:
       context: .
@@ -24,13 +39,8 @@ services:
     container_name: vector_db_service
     ports:
       - "8000:80"
-    environment:
-      PORT: 80
-      GUNICORN_WORKERS: 4
-      # Weaviate connection (used by your app)
-      WEAVIATE_HOST: weaviate
-      WEAVIATE_PORT: 8080
-      WEAVIATE_GRPC_PORT: 50051
+    env_file:
+      - vector_db_service/.env
     depends_on:
       weaviate:
         condition: service_healthy
@@ -56,7 +66,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:latest
     container_name: redis
     ports:
       - "6379:6379"

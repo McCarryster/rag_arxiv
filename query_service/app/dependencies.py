@@ -4,21 +4,23 @@ from pydantic import SecretStr
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
+from openai import OpenAI
 
 from langfuse import Langfuse
+from langfuse import get_client
 
 import config
-import prompt
-from utils import format_context_for_prompt
-from vector_search_manager import VectorSearchManager, LocalBM25StorageProvider, LocalFaissStorageProvider
+from vector_search_manager import VectorSearchManager
 from redis_cache_manager import RedisCacheManager
 from llm_generation_manager import LLMGenerationManager
+
 
 _vector_search_manager: Optional[VectorSearchManager] = None
 _redis_cache_manager: Optional[RedisCacheManager] = None
 _llm_generation_manger: Optional[LLMGenerationManager] = None
 
-def get_vector_search_manager(recreate: bool = False, langfuse_tracing: Optional[Langfuse] = None) -> VectorSearchManager:
+
+def get_vector_search_manager(recreate: bool = False) -> VectorSearchManager:
     """
     Get or create the singleton VectorSearchManager instance.
     
@@ -39,23 +41,17 @@ def get_vector_search_manager(recreate: bool = False, langfuse_tracing: Optional
         model=config.TEXT_EMBEDDING_MODEL
     )
 
-    # 2. Setup Storages (Environment Aware)
-    if not config.PROD:
-        faiss_p = LocalFaissStorageProvider(base_path=config.LOCAL_FAISS_PATH)
-        bm25_p = LocalBM25StorageProvider(base_path=config.LOCAL_BM25_PATH)
-    else:
-        raise NotImplementedError("S3 Storage Providers not yet implemented for PROD.")
+    langfuse = get_client() if config.LANGFUSE_AVAILABLE else None
 
     _vector_search_manager = VectorSearchManager(
         embedding_model=embedding_model,
-        faiss_storage_provider=faiss_p,
-        bm25_storage_provider=bm25_p,
         index_name="arxiv_papers_index",
         top_k=config.TOP_K,
-        langfuse_tracing=langfuse_tracing
+        langfuse_tracing=langfuse
     )
 
     return _vector_search_manager
+
 
 def get_redis_cache_manager(recreate: bool = False) -> RedisCacheManager:
     """
@@ -76,7 +72,8 @@ def get_redis_cache_manager(recreate: bool = False) -> RedisCacheManager:
     
     return _redis_cache_manager
 
-def get_llm_generation_manger(recreate: bool = False, langfuse_tracing: Optional[Langfuse] = None) -> LLMGenerationManager:
+
+def get_llm_generation_manger(recreate: bool = False) -> LLMGenerationManager:
     """
     Get or create the singleton LLMGenerationManager instance.
     
@@ -90,22 +87,14 @@ def get_llm_generation_manger(recreate: bool = False, langfuse_tracing: Optional
 
     if _llm_generation_manger is not None and not recreate:
         return _llm_generation_manger
-    
-    text_generation_model = ChatOpenAI(
-        api_key=SecretStr(config.OPENAI_API_KEY), 
-        model=config.TEXT_GENERATION_MODEL,
-        temperature=config.TEMPERATURE 
-    )
 
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", prompt.SYSTEM_PROMPT),
-        ("human", "{query}")
-    ])
+    client = OpenAI(api_key=config.OPENAI_API_KEY)
+
+    langfuse = get_client() if config.LANGFUSE_AVAILABLE else None
 
     _llm_generation_manger = LLMGenerationManager(
-        text_generation_model=text_generation_model,
-        prompt_template=prompt_template,
-        langfuse_tracing=langfuse_tracing
+        client=client,
+        langfuse_tracing=langfuse
     )
 
     return _llm_generation_manger

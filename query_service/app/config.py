@@ -25,19 +25,15 @@ LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "")
 
 # Vector search setup
 TOP_K: int = 15
+VECTOR_DB_HYBRID_SEARCH_URL: str = os.getenv("VECTOR_DB_HYBRID_SEARCH_URL", "")
+VECTOR_DB_METADATA_SEARCH_URL: str = os.getenv("VECTOR_DB_METADATA_SEARCH_URL", "")
 # Text generation setup
 TEMPERATURE: int = 0 # 0 for RAG factual accuracy
 
 # Redis db config
 RD = {
     "host": os.getenv("REDIS_HOST", ""),
-    "port": os.getenv("REDIS_PORT", 0),
-    "db": os.getenv("REDIS_DB", 0),
-    "password": os.getenv("REDIS_PASSWORD", ""),
+    "port": os.getenv("REDIS_PORT", "6379"),
+    "db": os.getenv("REDIS_DB", "0"),
+    "password": os.getenv("REDIS_PASSWORD", None),
 }
-
-# Paths
-# LOCAL_FAISS_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/vector_db"
-# LOCAL_BM25_PATH: str = "/home/mccarryster/very_big_work_ubuntu/ML_projects/rag_arxiv/data/bm25_storage"
-LOCAL_FAISS_PATH: str = os.getenv("LOCAL_FAISS_PATH", "")
-LOCAL_BM25_PATH: str = os.getenv("LOCAL_BM25_PATH", "")

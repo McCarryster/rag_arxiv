@@ -1,5 +1,5 @@
-from typing import Any, Dict, List
-from fastapi import FastAPI, HTTPException, Depends
+from typing import Any, Dict, List, Optional
+from fastapi import FastAPI, HTTPException, Depends, Body
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 from vector_db_manager import WeaviateDBManager
@@ -37,22 +37,37 @@ class HybridSearchRequest(BaseModel):
     query_embedding: List[float] = Field(..., description="Query embedding")
     limit: int = Field(default=5, ge=1)
     alpha: float = Field(default=0.5, ge=0.0, le=1.0)
-
 class HybridSearchResult(BaseModel):
     id: str
     text: str
     file_hash: str
     chunk_id: int
-
 class HybridSearchResponse(BaseModel):
     results: List[HybridSearchResult]
 
+class MetadataFilterItem(BaseModel):
+    id: Optional[str] = None
+    chunk_id: Optional[int] = None
+    file_hash: Optional[str] = None
+
+class MetadataSearchRequest(BaseModel):
+    filters: List[MetadataFilterItem]
+    limit: int = 10
+
+class MetadataSearchResult(BaseModel):
+    id: str
+    text: Optional[str] = None
+    file_hash: Optional[str] = None
+    chunk_id: Optional[int] = None
+
+class MetadataSearchResponse(BaseModel):
+    results: List[MetadataSearchResult]
 
 # -------------------------
 # Routes
 # -------------------------
 @app.post("/embeddings/add")
-def add_embeddings(
+async def add_embeddings(
     request: AddEmbeddingsRequest,
     vector_db_manager: WeaviateDBManager = Depends(get_vector_db_manager),
 ) -> Dict[str, str]:
@@ -74,7 +89,7 @@ def add_embeddings(
     return {"status": "success"}
 
 @app.post("/search/hybrid", response_model=HybridSearchResponse)
-def hybrid_search(
+async def hybrid_search(
     request: HybridSearchRequest,
     vector_db_manager: WeaviateDBManager = Depends(get_vector_db_manager),
 ) -> HybridSearchResponse:
@@ -102,6 +117,34 @@ def hybrid_search(
             for item in results
         ]
     )
+
+@app.post("/search/metadata", response_model=MetadataSearchResponse)
+async def search_by_metadata(
+    request: MetadataSearchRequest = Body(...),
+    vector_db_manager: WeaviateDBManager = Depends(get_vector_db_manager),
+) -> MetadataSearchResponse:
+    try:
+        results = vector_db_manager.search_docs_by_metadata_groups(
+            filters=request.filters, # type: ignore
+            limit=request.limit,
+        )
+        response_results = [
+            MetadataSearchResult(
+                id=str(r["id"]),
+                text=r.get("text"),
+                file_hash=r.get("file_hash"),
+                chunk_id=r.get("chunk_id"),
+            )
+            for r in results
+        ]
+        return MetadataSearchResponse(results=response_results)
+    except ValueError as ve:
+        # semantic error (bad request from client)
+        print("[DEBUG] Bad request in search_by_metadata: %s", ve, flush=True)
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        print("Internal error while searching by metadata", flush=True)
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/health")
 def health_check() -> Dict[str, str]:

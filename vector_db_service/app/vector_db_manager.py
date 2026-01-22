@@ -1,6 +1,7 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import hashlib
 import uuid
+from pydantic import BaseModel
 
 import weaviate
 from weaviate.classes.config import (
@@ -8,9 +9,15 @@ from weaviate.classes.config import (
     Property,
     DataType,
 )
-from weaviate.classes.query import HybridFusion
+from weaviate.classes.query import HybridFusion, Filter
 
 import config
+
+
+class MetadataFilterItem(BaseModel):
+    id: Optional[int] = None
+    chunk_id: Optional[int] = None
+    file_hash: Optional[str] = None
 
 class WeaviateDBManager:
     def __init__(self, collection_name: str, index_name: str):
@@ -45,7 +52,7 @@ class WeaviateDBManager:
                 Property(name="text", data_type=DataType.TEXT),
                 Property(name="file_hash", data_type=DataType.TEXT, index_filterable=True),
                 Property(name="chunk_id", data_type=DataType.INT, index_filterable=True),
-                Property(name="source", data_type=DataType.TEXT),  # optional, if you need it
+                Property(name="source", data_type=DataType.TEXT),
             ],
             vector_config=Configure.Vectors.self_provided(),
         )
@@ -118,6 +125,53 @@ class WeaviateDBManager:
         response = self._collection.query.hybrid(
             query=query_text,
             **kwargs,
+        )
+
+        results: List[Dict[str, Any]] = []
+        for obj in response.objects:
+            props = obj.properties
+            results.append(
+                {
+                    "id": obj.uuid,
+                    "text": props.get("text"),
+                    "file_hash": props.get("file_hash"),
+                    "chunk_id": props.get("chunk_id"),
+                }
+            )
+
+        return results
+
+    def search_docs_by_metadata_groups(
+        self,
+        filters: List[MetadataFilterItem],
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        if not filters:
+            raise ValueError("filters list cannot be empty")
+
+        or_filter = None
+
+        for item in filters:
+            and_filter = None
+
+            for key, value in item.model_dump(exclude_none=True).items():
+                if key == "id":
+                    this_filter = Filter.by_id().equal(value)  # special case for UUID
+                else:
+                    this_filter = Filter.by_property(key).equal(value)
+
+                and_filter = this_filter if and_filter is None else and_filter & this_filter
+
+            if and_filter is not None:
+                or_filter = and_filter if or_filter is None else or_filter | and_filter
+
+        if or_filter is None:
+            raise ValueError("No valid filters provided")
+
+        response = self._collection.query.fetch_objects(
+            limit=limit,
+            filters=or_filter,
+            return_properties=["text", "file_hash", "chunk_id"],
         )
 
         results: List[Dict[str, Any]] = []

@@ -1,9 +1,10 @@
 import hashlib
-import requests
+from fastapi.concurrency import run_in_threadpool
+import asyncio
+import httpx
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import tiktoken
-import time
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -81,7 +82,7 @@ class VectorStoreManager:
         else:
             return self.embedding_model.embed_documents(texts)
 
-    def add_embeddings(self, file_paths: Dict[str, str]) -> None:
+    async def add_embeddings(self, file_paths: Dict[str, str]) -> None:
         new_documents: List[Document] = []
 
         # 1. Processing and Chunking
@@ -104,7 +105,8 @@ class VectorStoreManager:
         if new_documents:
             texts: List[str] = [doc.page_content for doc in new_documents]
             metadatas: List[dict] = [doc.metadata for doc in new_documents]
-            embeddings: List[List[float]] = self._generate_embeddings(texts)
+            # embeddings: List[List[float]] = self._generate_embeddings(texts)
+            embeddings: List[List[float]] = await run_in_threadpool(self._generate_embeddings, texts)
 
             payload: dict = {
                 "texts": texts,
@@ -112,22 +114,32 @@ class VectorStoreManager:
                 "metadatas": metadatas,
             }
 
-            # Add embeddings to weaviate db
-            last_exception: Exception | None = None
-            for attempt in range(5):
-                try:
-                    response = requests.post(
-                        url=config.VECTOR_DB_API_URL,
-                        json=payload,
-                        timeout=120,
-                    )
-                    response.raise_for_status()
-                    return
-                except Exception as exc:
-                    last_exception = exc
-                    time.sleep(2)
+            await self._send_embeddings_with_retry(payload)
 
-            # If all retries failed
-            raise RuntimeError(
-                f"Failed to send embeddings to vector DB after retries: {last_exception}"
+    async def _post_to_vector_db_async(self, payload: dict) -> None:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                url=config.VECTOR_DB_API_URL,
+                json=payload,
             )
+            response.raise_for_status()
+
+    async def _send_embeddings_with_retry(
+        self,
+        payload: Dict[str, Any],
+        retries: int = 5,
+        delay_seconds: float = 2.0,
+    ) -> None:
+        last_exception: Optional[Exception] = None
+
+        for _ in range(retries):
+            try:
+                await self._post_to_vector_db_async(payload)
+                return
+            except Exception as exc:
+                last_exception = exc
+                await asyncio.sleep(delay_seconds)
+
+        raise RuntimeError(
+            f"Failed to send embeddings to vector DB after retries: {last_exception}"
+        )

@@ -1,9 +1,12 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "indexing-service"
-    metrics_path: "/metrics"
+  - job_name: "index_service"
     static_configs:
-      - targets:
-          - "indexing_service:8000"
+      - targets: ["index_service:80"]
+
+  - job_name: "query_service"
+    static_configs:
+      - targets: ["query_service:80"]

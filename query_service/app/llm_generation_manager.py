@@ -19,78 +19,7 @@ class LLMGenerationManager:
     def __init__(self, client: OpenAI) -> None:
         self.client: OpenAI = client
 
-    # def _generate_answer_sync(self, query: str, retrieved_docs) -> str:
-    #     if self.langfuse_tracing:
-    #         with self.langfuse_tracing.start_as_current_observation(
-    #             as_type="generation",
-    #             name="openai_answer_generation",
-    #             model=config.TEXT_GENERATION_MODEL
-    #         ) as generation_obs:
-    #             context: str = format_context_for_prompt(retrieved_docs)
-                
-    #             # For Langfuse tracing - capture what you're sending
-    #             trace_input = [
-    #                 {
-    #                     "role": "user",
-    #                     "content": (
-    #                         f"Context:\n{context}\n\n"
-    #                         f"Question: {query}\n\n"
-    #                         "Answer:"
-    #                     ),
-    #                 }
-    #             ]
-                
-    #             generation_obs.update(input=trace_input)
-                
-    #             resp = self.client.responses.create(
-    #                 model=config.TEXT_GENERATION_MODEL,
-    #                 instructions=prompt.SYSTEM_PROMPT,
-    #                 input=[
-    #                     {
-    #                         "role": "user",
-    #                         "content": (
-    #                             f"Context:\n{context}\n\n"
-    #                             f"Question: {query}\n\n"
-    #                             "Answer:"
-    #                         ),
-    #                     }
-    #                 ],
-    #                 store=False,
-    #             )
-                
-    #             answer = resp.output_text.strip()
-    #             usage_details: Optional[Dict[str, int]] = None
-    #             if resp.usage is not None:
-    #                 usage_details = {
-    #                     "input": resp.usage.input_tokens,
-    #                     "output": resp.usage.output_tokens,
-    #                     "total": resp.usage.total_tokens,
-    #                 }
-    #             generation_obs.update(
-    #                 output=answer,
-    #                 usage_details=usage_details,
-    #             )
-    #             return answer
-    #     else:
-    #         context: str = format_context_for_prompt(retrieved_docs)
-    #         resp = self.client.responses.create(
-    #             model=config.TEXT_GENERATION_MODEL,
-    #             instructions=prompt.SYSTEM_PROMPT,
-    #             input=[
-    #                 {
-    #                     "role": "user",
-    #                     "content": (
-    #                         f"Context:\n{context}\n\n"
-    #                         f"Question: {query}\n\n"
-    #                         "Answer:"
-    #                     ),
-    #                 }
-    #             ],
-    #             store=False,
-    #         )
-    #         return resp.output_text.strip()
-
-    @async_trace(name="query pipeline", model=config.TEXT_GENERATION_MODEL)
+    @async_trace(name="llm answer generation", model=config.TEXT_GENERATION_MODEL)
     async def generate_answer(self, query: str, retrieved_docs: List[Document]) -> Dict[str, Any]:
         return await run_in_threadpool(self._generate_answer_sync, query, retrieved_docs)
 

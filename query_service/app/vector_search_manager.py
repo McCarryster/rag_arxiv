@@ -108,7 +108,7 @@ class VectorSearchManager:
             )
         return results
 
-    @async_trace(name="query pipeline", model=config.TEXT_EMBEDDING_MODEL)
+    @async_trace(name="query embedings generation", model=config.TEXT_EMBEDDING_MODEL)
     async def generate_embeddings(self, text: str) -> Dict[str, Any]:
         embedding: List[float] = await run_in_threadpool(self.embedding_model.embed_query, text)
         encoding = tiktoken.encoding_for_model(config.TEXT_EMBEDDING_MODEL)

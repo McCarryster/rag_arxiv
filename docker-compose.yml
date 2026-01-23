@@ -9,7 +9,7 @@ services:
       vector_db_service:
         condition: service_started
     ports:
-      - "9000:80"   # expose FastAPI if you want host access
+      - "9000:80"
     env_file:
       - index_service/.env
     volumes:
@@ -26,7 +26,7 @@ services:
       vector_db_service:
         condition: service_started
     ports:
-      - "9001:80"   # expose FastAPI if you want host access
+      - "9001:80"
     env_file:
       - query_service/.env
     restart: unless-stopped
@@ -72,6 +72,32 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - index_service
+      - query_service
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   weaviate_data:
   pdf_storage_data:
+  prometheus_data:
+  grafana_data:

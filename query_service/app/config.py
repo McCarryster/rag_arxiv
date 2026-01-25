@@ -14,6 +14,7 @@ OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 # Model configuration
 TEXT_GENERATION_MODEL: str = "gpt-5-nano"
 TEXT_EMBEDDING_MODEL: str = "text-embedding-3-small"
+TEMPERATURE: int = 0 # 0 for RAG factual accuracy
 
 
 # Langfuse set up
@@ -27,8 +28,7 @@ LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "")
 TOP_K: int = 15
 VECTOR_DB_HYBRID_SEARCH_URL: str = os.getenv("VECTOR_DB_HYBRID_SEARCH_URL", "")
 VECTOR_DB_METADATA_SEARCH_URL: str = os.getenv("VECTOR_DB_METADATA_SEARCH_URL", "")
-# Text generation setup
-TEMPERATURE: int = 0 # 0 for RAG factual accuracy
+
 
 # Redis db config
 RD = {

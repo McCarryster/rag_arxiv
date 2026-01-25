@@ -80,7 +80,6 @@ redis_semantic_search_latency: Histogram = meter.create_histogram(
 # ------------------------------
 # FastAPI app
 # ------------------------------
-@observe()
 @app.post("/query", response_model=IndexResponse)
 async def query_index(
     request: QueryRequest,
@@ -99,7 +98,6 @@ async def query_index(
     # ------------------------------------------------------------------
     exact_hit: Optional[Dict[str, Any]] = cache_manager.get_exact_cache(request.user_query, corpus_version=corpus_version)
     if exact_hit:
-        print("[DEBUG]:exact hit", request.user_query, flush=True)
         return IndexResponse(
             message="Success (Exact Cache Hit)",
             model_response=exact_hit["model_response"],
@@ -113,7 +111,6 @@ async def query_index(
     embedding_dict: Dict[str, Any] = await vector_search_manager.generate_embeddings(request.user_query)
     query_embedding: List[float] = embedding_dict['result']
 
-
     # ------------------------------------------------------------------
     # 3. Semantic cache (validated by corpus version + non-empty sources)
     # ------------------------------------------------------------------
@@ -123,7 +120,6 @@ async def query_index(
         threshold=0.7,
         corpus_version=corpus_version,
     )
-    print("[DEBUG]:semantic hit", request.user_query, flush=True)
     end_time: float = time.perf_counter()
     hb_search_latency.record(end_time-start_time, {"endpoint": "/index"}) # Track time
 
@@ -131,7 +127,6 @@ async def query_index(
     if semantic_hit:
         score: float = semantic_hit["score"]
         data: Dict[str, Any] = semantic_hit["data"]
-        print("[DEBUG]:score", score, flush=True)
         
         # Never reuse semantic cache created with NO retrieval
         if not data.get("sources"):
@@ -148,9 +143,7 @@ async def query_index(
         
         # Scenario 2: Same topic, different phrasing (Medium Confidence). Reuse the source metadata to skip Hybrid Search
         cached_metadata: List[Dict[str, Any]] = data["sources"]
-        # print("DEBUG data['sources']:", cached_metadata, flush=True)
         retrieved_docs = await vector_search_manager.get_docs_by_metadata(cached_metadata)
-        print("[DEBUG] retrieved_docs:", retrieved_docs, flush=True)
 
 
     # ------------------------------------------------------------------
@@ -161,8 +154,6 @@ async def query_index(
         retrieved_docs = await vector_search_manager.perform_hybrid_search(request.user_query, query_embedding)
         end_time: float = time.perf_counter()
         redis_semantic_search_latency.record(end_time-start_time, {"endpoint": "/query"}) # Track time
-    else:
-        print("[DEBUG]:", "HYBRID SEARCH SKIPPED", flush=True)
     
 
     # ------------------------------------------------------------------
@@ -210,14 +201,16 @@ async def query_index(
         cache_payload,
         corpus_version=corpus_version,
     )
-    
+
+  
     cache_manager.set_semantic_cache(
         query_text=request.user_query,
         query_vector=query_embedding,
         data=cache_payload,
         corpus_version=corpus_version,
     )
-    
+
+
     return IndexResponse(
         message="Success",
         model_response=answer,

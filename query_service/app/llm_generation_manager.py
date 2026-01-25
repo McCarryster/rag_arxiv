@@ -1,10 +1,8 @@
-from langfuse import Langfuse
-from typing import List, Optional, Dict, Any
-from langfuse.langchain import CallbackHandler
+from typing import List, Dict, Any
 from langchain_core.documents import Document
+import time
 
 from openai import OpenAI
-import tiktoken
 from langfuse_decorator import async_trace
 
 import prompt
@@ -38,9 +36,13 @@ class LLMGenerationManager:
                     ),
                 }
             ],
+            max_output_tokens=256,              # hard cap (includes reasoning tokens)
+            reasoning={"effort": "minimal"},    # or "low"
+            text={"verbosity": "low"},          # less verbose wording
             store=False,
         )
         answer = resp.output_text.strip()
+
         input_tokens: int = 0
         output_tokens: int = 0
         total_tokens: int = 0

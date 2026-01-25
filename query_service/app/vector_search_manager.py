@@ -113,8 +113,6 @@ class VectorSearchManager:
         embedding: List[float] = await run_in_threadpool(self.embedding_model.embed_query, text)
         encoding = tiktoken.encoding_for_model(config.TEXT_EMBEDDING_MODEL)
         total_input_tokens: int = len(encoding.encode(text))
-
-        print("[DEBUG]: LANFUSE", "Shit happened", flush=True)
         
         result: Dict[str, Any] = {
             "result": embedding,

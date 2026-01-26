@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vector-db-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vector-db-service
+  template:
+    metadata:
+      labels:
+        app: vector-db-service
+    spec:
+      containers:
+        - name: vector-db-service
+          image: vector_db_service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: vector-db-env

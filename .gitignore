@@ -9,4 +9,8 @@ TODO.md
 data/
 
 tests/
-k8s/
+
+
+index_service.env
+query_service.env
+vector_db_service.env

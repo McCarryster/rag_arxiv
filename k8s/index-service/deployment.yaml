@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: index-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: index-service
+  template:
+    metadata:
+      labels:
+        app: index-service
+    spec:
+      containers:
+        - name: index-service
+          image: index_service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: index-service-env
+          volumeMounts:
+            - name: pdf-storage
+              mountPath: /app/data/pdfs
+      volumes:
+        - name: pdf-storage
+          persistentVolumeClaim:
+            claimName: pdf-storage-pvc

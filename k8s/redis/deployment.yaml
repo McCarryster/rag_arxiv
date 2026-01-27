@@ -15,5 +15,17 @@ spec:
       containers:
         - name: redis
           image: redis/redis-stack-server:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
+          command:
+            - redis-stack-server
+            - --appendonly
+            - "yes"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data-pvc

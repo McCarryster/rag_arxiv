@@ -32,8 +32,8 @@ VECTOR_DB_METADATA_SEARCH_URL: str = os.getenv("VECTOR_DB_METADATA_SEARCH_URL", 
 
 # Redis db config
 RD = {
-    "host": os.getenv("REDIS_HOST", ""),
-    "port": os.getenv("REDIS_PORT", "6379"),
-    "db": os.getenv("REDIS_DB", "0"),
+    "host": os.getenv("REDIS_HOST", "localhost"),
+    "port": int(os.getenv("REDIS_PORT", "6379")),
+    "db": int(os.getenv("REDIS_DB", "0")),
     "password": os.getenv("REDIS_PASSWORD", None),
 }

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rag-arxiv-app
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+secretGenerator:
+  - name: query-service-env
+    envs:
+      - query_service.env
+
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'index_service'
+    static_configs:
+      - targets: ['index-service:80']
+
+  - job_name: 'query_service'
+    static_configs:
+      - targets: ['query-service:80']

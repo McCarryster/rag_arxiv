@@ -6,7 +6,8 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: query-service       # connects to the pods
+    app: query-service
   ports:
-    - port: 80
-      targetPort: 80
+    - protocol: TCP
+      port: 80       # external port on the LoadBalancer
+      targetPort: 80 # container port

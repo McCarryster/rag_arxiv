@@ -3,6 +3,7 @@ NAMESPACE=rag-arxiv-app
 
 # All kustomize directories
 KUSTOMIZE_DIRS := k8s/redis k8s/index-service k8s/vector-db-service k8s/query-service k8s/prometheus k8s/grafana
+# KUSTOMIZE_DIRS := k8s/redis k8s/vector-db-service
 
 # Default target: deploy everything
 .PHONY: all

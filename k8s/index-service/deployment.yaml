@@ -12,9 +12,11 @@ spec:
       labels:
         app: index-service
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: index-service
-          image: index_service:latest
+          image: 633605692921.dkr.ecr.eu-central-1.amazonaws.com/index-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

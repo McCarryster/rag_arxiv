@@ -12,6 +12,8 @@ spec:
       labels:
         app: prometheus
     spec:
+      securityContext:
+        fsGroup: 2000
       containers:
         - name: prometheus
           image: prom/prometheus:latest

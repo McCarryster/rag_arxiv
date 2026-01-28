@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: vector-db-service
-          image: vector_db_service:latest
+          image: 633605692921.dkr.ecr.eu-central-1.amazonaws.com/vector-db-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
